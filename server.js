@@ -18,16 +18,24 @@ var cors = require('cors');
 app.use(cors());
 app.use(express.json());
 
-// receive hash sent when correctly recycled
-// receive from local 
-// record to redis
+// receive from pi 
 app.post("/register/newtrash", async function(req,res){
     console.log("**************************************************");
     console.log("/register/newtrash");
     const newHash = req.body.hash;
     redis.sadd("hashes", newHash);
-    res.status(200).send("registered new trash");
+    res.status(200).json({"reply":"registered new trash"});
 });
+
+// receive from pi
+app.post("/register/fee", async function(req,res){
+    console.log("**************************************************");
+    console.log("/register/newtrash");
+    const fee = req.body.fee;
+    redis.hset("fee", "fixedFee", fee);
+    res.status(200).json({"reply":"registered new fee"});
+});
+
 
 // FIRST TIME REGISTERING
 // receive user-inputted has from website
@@ -37,6 +45,9 @@ app.post("/register/newtrash", async function(req,res){
     set user share to 1 
 */
 
+// <cryptographically secured>
+/// verifies authenticity of signature from private-key containing server (website)
+// before sending a reply
 app.post("/register/newuser", async function(req,res){
     console.log("***************************************************");
     console.log("/register/newuser");
@@ -70,7 +81,9 @@ app.post("/register/newuser", async function(req,res){
     }
 });
 
-
+// <cryptographically secured>
+// verifies authenticity of signature from private-key containing server (website)
+// before sending a reply
 app.post("/register/user", async function(req,res){
     console.log("***************************************************");
     console.log("/register/user");
@@ -155,7 +168,12 @@ app.get("/get/information", async function(req,res){
     console.log("/get/information");
 
     const users = await redis.smembers('users');
-    res.status(200).json({"users": users});
+    const fee = await redis.hget("fee", "fixedFee");
+    const pot = users * fee;
+    res.status(200).json({
+	    "users": users,
+	    "pot": pot
+    });
 })
 
 async function isHashRegistered(hash){
@@ -165,6 +183,12 @@ async function isHashRegistered(hash){
 async function isUserRegistered(user){
     return await redis.sismember("users", user);
 }
+
+app.get("/", (req, res) => {
+	console.log('connection');
+	res.status(200).json({"worked": true});
+}
+)
 
 function isVerified(signature, data){
     const data_string = JSON.stringify(data)
